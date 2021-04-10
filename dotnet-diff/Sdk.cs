@@ -204,6 +204,7 @@ namespace DotnetDiff
 
                     console.WriteLineDebug($"GET {uri}");
                     bool jitFound = false;
+
                     var status = IO.Download(uri, tmpFile, (read, total) =>
                     {
                         if (read is not null && total is not null)
@@ -215,7 +216,7 @@ namespace DotnetDiff
                                 console.Out.WriteLine($"GET {uri}");
                             }
 
-                            ReportProgress(read, total, console);
+                            TerminalProgressReporter.Report(read, total, console);
                         }
                         else
                         {
@@ -284,7 +285,7 @@ namespace DotnetDiff
                 url += "content?api-version=6.0-preview.1";
 
                 console.Out.WriteLine($"GET {url}");
-                var response = IO.Download(url, tempFile, (read, total) => ReportProgress(read, total, console));
+                var response = IO.Download(url, tempFile, (read, total) => TerminalProgressReporter.Report(read, total, console));
                 if (response != HttpStatusCode.OK)
                 {
                     throw new Exception($"Failed to download {item}, server returned: '{response}'");
@@ -303,39 +304,6 @@ namespace DotnetDiff
                 {
                     IO.EnsureDeletion(tempDir);
                 }
-            }
-        }
-
-        private static void ReportProgress(long? bytesRead, long? totalBytes, IConsole console)
-        {
-            static string FormatBytes(long bytes) => Math.Log10(bytes) switch
-            {
-                <= 3 => $"{bytes}",
-                <= 6 => $"{bytes / 1024} KB",
-                <= 9 => $"{bytes / (1024 * 1024)} MB",
-                _ => $"{bytes / (1024 * 1024 * 1024)} GB",
-            };
-
-            if (bytesRead is null || totalBytes is null)
-            {
-                console.Out.Write($"[{new string('-', 100)}]");
-                return;
-            }
-
-            var done = (int)Math.Round((double)bytesRead / totalBytes.Value * 100, 2);
-            var remaining = 100 - done;
-
-            var total = FormatBytes(totalBytes.Value);
-            var read = FormatBytes(bytesRead.Value);
-
-            var message = $"[{new string('=', done)}{new string('-', remaining)}] {read} / {total}";
-            console.Out.SetHorizontalPosition(0);
-            console.Out.Write(message);
-            console.Out.EraseCharacters(message.Length);
-
-            if (totalBytes == bytesRead)
-            {
-                console.Out.WriteLine();
             }
         }
 

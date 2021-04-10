@@ -76,16 +76,17 @@ namespace DotnetDiff
             }
 
             using var contentStream = response.Content.ReadAsStream();
-            
+
             var totalBytes = response.Content.Headers.ContentLength;
 
             TriggerProgressChanged(totalBytes, 0);
 
             var totalDownloadSize = totalBytes;
             var totalBytesRead = 0L;
-            var readCount = 0L;
+            var savedTotalBytesRead = 0L;
             var buffer = new byte[8192];
             var isMoreToRead = true;
+            var timesRead = 0;
 
             using var fileStream = new FileStream(destinationFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192);
             do
@@ -101,10 +102,23 @@ namespace DotnetDiff
                 fileStream.Write(buffer.AsSpan(0, bytesRead));
 
                 totalBytesRead += bytesRead;
-                readCount += 1;
 
-                if (readCount % 100 == 0)
-                    TriggerProgressChanged(totalDownloadSize, totalBytesRead);
+                if (totalDownloadSize is not null)
+                {
+                    if (((double)(totalBytesRead - savedTotalBytesRead) / totalDownloadSize) > 0.01)
+                    {
+                        TriggerProgressChanged(totalDownloadSize, totalBytesRead);
+                        savedTotalBytesRead = totalBytesRead;
+                    }
+                }
+                else
+                {
+                    timesRead++;
+                    if (timesRead % 50 is 0)
+                    {
+                        TriggerProgressChanged(totalDownloadSize, totalBytesRead);
+                    }
+                }
             }
             while (isMoreToRead);
 
