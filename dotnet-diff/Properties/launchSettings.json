@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "dotnet-diff": {
+      "commandName": "Project",
+      "commandLineArgs": "install jit",
+      "environmentVariables": {
+        "DOTNET_DIFF_DEBUG_LOG": "0"
+      }
+    }
+  }
+}
