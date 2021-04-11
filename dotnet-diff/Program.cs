@@ -37,16 +37,22 @@ namespace DotnetDiff
             var installSdk = new Command("sdk", "Installs the bits of the SDK necessary for dotnet-diff to work")
             {
                 FrameworkInstallOption("SDK"),
-                RuntimesInstallOption("Jit")
+                RuntimesInstallOption("SDK")
             };
             installSdk.Handler = CommandHandler.Create<string, string[], IConsole>(InstallSdkHandler);
 
-            var installJits = new Command("jit", "Installs the Jits for the specified targets")
+            var installJit = new Command("jit", "Installs the Jits for the specified targets")
             {
                 FrameworkInstallOption("Jit"),
                 RuntimesInstallOption("Jit")
             };
-            installJits.Handler = CommandHandler.Create<string, string[], IConsole>(InstallJitHandler);
+            installJit.Handler = CommandHandler.Create<string, string[], IConsole>(InstallJitHandler);
+
+            var installCrossgen2 = new Command("crossgen2", "Installs the Crossgen2 compiler")
+            {
+                FrameworkInstallOption("Crossgen2")
+            };
+            installCrossgen2.Handler = CommandHandler.Create<string, IConsole>(InstallCrossgen2Handler);
 
             var listSdkInstall = new Command("sdks", "Lists the SDKs installed by dotnet-diff")
             {
@@ -62,7 +68,8 @@ namespace DotnetDiff
             {
                 installJitutils,
                 installSdk,
-                installJits,
+                installJit,
+                installCrossgen2,
                 listInstall
             };
 
@@ -110,6 +117,13 @@ namespace DotnetDiff
             {
                 Sdk.InstallJit(version, target, Metadata, console);
             }
+        }
+
+        private static void InstallCrossgen2Handler(string framework, IConsole console)
+        {
+            var version = ParseVersion(framework);
+
+            Sdk.InstallCrossgen2(version, Metadata, console);
         }
 
         private static FrameworkVersion ParseVersion(string framework)

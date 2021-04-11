@@ -73,15 +73,21 @@ namespace DotnetDiff
             return builder.Build();
         }
 
-        public static Jit InstallJit(FrameworkVersion version, RuntimeIdentifier targetRuntimeIdentifier, ProgramMetadata metadata, IConsole console)
+        public static void InstallCrossgen2(FrameworkVersion version, ProgramMetadata metadata, IConsole console)
+        {
+            var builder = new SdkBuilder(version);
+            InstallCrossgen2(builder, console);
+
+            metadata.AddCrossgen2(version);
+        }
+
+        public static void InstallJit(FrameworkVersion version, RuntimeIdentifier targetRuntimeIdentifier, ProgramMetadata metadata, IConsole console)
         {
             var dir = JitDirectory(version, targetRuntimeIdentifier);
             var builder = new TargetBuilder(version, targetRuntimeIdentifier, dir);
             InstallJit(builder, console);
 
             metadata.AddJit(version, targetRuntimeIdentifier);
-
-            return Jit.CreateFromPath(Path.Combine(dir, Jit.GetJitName(targetRuntimeIdentifier)));
         }
 
         public Jit JitForRid(RuntimeIdentifier runtimeIdentifier) => _targets.TryGetValue(runtimeIdentifier, out var target) ? target.Jit : throw new Exception($"No Jit could be found for {runtimeIdentifier}");
