@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 
 namespace DotnetDiff
 {
@@ -32,13 +33,16 @@ namespace DotnetDiff
 
             var os = target.Platform switch
             {
-                Platform.Windows => "windows",
+                Platform.Windows => "win",
                 Platform.Linux => "unix",
-                Platform.MacOS => "osx",
+                Platform.MacOS when target.Architecture is Architecture.X64 => "unix",
+                Platform.MacOS when target.Architecture is Architecture.Arm64 => "unix_osx",
                 _ => throw new NotSupportedException($"Unsupported OS: {target.Platform}")
             };
+            var arch = target.Architecture.ToString().ToLowerInvariant();
+            var hostArch = RuntimeIdentifier.Host.Architecture.ToString().ToLowerInvariant();
 
-            return IO.LibraryFileName($"{baseName}_{os}_{target.Architecture}");
+            return IO.LibraryFileName($"{baseName}_{os}_{arch}_{hostArch}");
         }
     }
 }

@@ -84,6 +84,8 @@ namespace DotnetDiff
             return true;
         }
 
+        public bool Crossgen2IsAvailable(FrameworkVersion sdk) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Crossgen2;
+
         public bool FullTargetIsAvailable(FrameworkVersion sdk, RuntimeIdentifier target)
         {
             if (!_holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder))
@@ -100,6 +102,10 @@ namespace DotnetDiff
 
             return true;
         }
+
+        public bool RuntimeAssembliesAreAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Targets.TryGetValue(target.ToString(), out var targetHolder) && targetHolder.RuntimeAssemblies;
+
+        public bool JitIsAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Targets.TryGetValue(target.ToString(), out var targetHolder) && targetHolder.Jit;
 
         public IEnumerable<FrameworkVersion> EnumerateSdks() => _holder.Sdks.Select(x => new FrameworkVersion(x.Key));
 
@@ -144,7 +150,7 @@ namespace DotnetDiff
         private sealed record SdkHolder
         {
             public bool Crossgen2 { get; set; }
-            public Dictionary<string, TargetHolder> Targets { get; } = new Dictionary<string, TargetHolder>();
+            public Dictionary<string, TargetHolder> Targets { get; set; } = new Dictionary<string, TargetHolder>();
         }
 
         private sealed record TargetHolder

@@ -3,7 +3,6 @@ using System.CommandLine.Invocation;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 
 namespace DotnetDiff
 {
@@ -85,27 +84,22 @@ namespace DotnetDiff
             var totalBytesRead = 0L;
             var savedTotalBytesRead = 0L;
             var buffer = new byte[8192];
-            var isMoreToRead = true;
+            var bytesRead = 0;
             var timesRead = 0;
 
             using var fileStream = new FileStream(destinationFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192);
             do
             {
-                var bytesRead = contentStream.Read(buffer);
-                if (bytesRead == 0)
-                {
-                    isMoreToRead = false;
-                    TriggerProgressChanged(totalDownloadSize, totalBytesRead);
-                    continue;
-                }
-
+                bytesRead = contentStream.Read(buffer);
                 fileStream.Write(buffer.AsSpan(0, bytesRead));
 
                 totalBytesRead += bytesRead;
 
                 if (totalDownloadSize is not null)
                 {
-                    if (((double)(totalBytesRead - savedTotalBytesRead) / totalDownloadSize) > 0.01)
+                    var delta = 100_000 * (totalBytesRead - savedTotalBytesRead) / totalDownloadSize;
+                    var percentage = 100_000 * totalBytesRead / totalDownloadSize;
+                    if (delta > 1_000 && percentage <= 99_000)
                     {
                         TriggerProgressChanged(totalDownloadSize, totalBytesRead);
                         savedTotalBytesRead = totalBytesRead;
@@ -119,8 +113,15 @@ namespace DotnetDiff
                         TriggerProgressChanged(totalDownloadSize, totalBytesRead);
                     }
                 }
+
+                if (bytesRead is 0)
+                {
+                    break;
+                }
             }
-            while (isMoreToRead);
+            while (true);
+
+            TriggerProgressChanged(totalDownloadSize, totalBytesRead);
 
             return response.StatusCode;
         }

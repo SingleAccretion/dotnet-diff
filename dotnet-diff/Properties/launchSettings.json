@@ -2,7 +2,7 @@
   "profiles": {
     "dotnet-diff": {
       "commandName": "Project",
-      "commandLineArgs": "install jit",
+      "commandLineArgs": "install jit -r linux-x64",
       "environmentVariables": {
         "DOTNET_DIFF_DEBUG_LOG": "0"
       }

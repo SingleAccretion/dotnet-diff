@@ -177,7 +177,7 @@ namespace DotnetDiff
             var parentCommit = builder.Version.CommitHash;
             while (true)
             {
-                console.Out.WriteLine($"Trying to find a checked Jit built before {parentCommit}");
+                console.Out.WriteLine($"Trying to find a checked {Jit.GetJitName(builder.Target)} built before {parentCommit}");
 
                 List<string>? commits = GetCommits(parentCommit, out var code);
                 if (commits is null)
@@ -246,6 +246,7 @@ namespace DotnetDiff
                     console.Out.WriteLine($"Failed to find any Jit in the rolling builds storage for commit range {commits[^1]}-{builder.Version.CommitHash}");
                 }
 
+                console.Out.WriteLine();
                 searchDepth--;
             }
         }

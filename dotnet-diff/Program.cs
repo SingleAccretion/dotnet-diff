@@ -145,10 +145,26 @@ namespace DotnetDiff
             console.Out.WriteLine($"Install location: '{AppDir}'");
             foreach (var version in metadata.EnumerateSdks())
             {
-                console.Out.WriteLine($"SDK for .NET {version}");
+                console.Out.WriteLine($"- SDK for {version}");
+                if (metadata.Crossgen2IsAvailable(version))
+                {
+                    console.Out.WriteLine($" - Crossgen2");
+                }
                 foreach (var target in metadata.EnumerateTargets(version))
                 {
-                    console.Out.WriteLine($" - Targeting {target}");
+                    if (metadata.RuntimeAssembliesAreAvailable(version, target) ||
+                        metadata.JitIsAvailable(version, target))
+                    {
+                        console.Out.WriteLine($" - {target} target");
+                        if (metadata.RuntimeAssembliesAreAvailable(version, target))
+                        {
+                            console.Out.WriteLine($"  - Runtime assemblies");
+                        }
+                        if (metadata.JitIsAvailable(version, target))
+                        {
+                            console.Out.WriteLine($"  - Jit");
+                        }
+                    }
                 }
             }
         }
@@ -160,8 +176,6 @@ namespace DotnetDiff
             var dir = Path.Combine(DasmBasePath, $"{Path.GetFileName(baseAssembly)}-vs-{Path.GetFileName(newAssembly)}-{Guid.NewGuid()}");
             var jitDasm = Path.Combine(JitUtilsBinPath, "jit-dasm.exe");
             var jitAnalyze = Path.Combine(JitUtilsBinPath, "jit-analyze.exe");
-
-            // var sdk = Sdk.Resolve(FrameworkVersion.BestGuessSdkVersionForAssembly(baseAssembly), Metadata, console);
 
             var platform = @"C:\Users\Accretion\source\dotnet\build\CustomCoreRoot";
             var crossgen = @"C:\Users\Accretion\source\dotnet\runtime\artifacts\bin\coreclr\windows.x64.Checked\crossgen2\crossgen2.exe";
