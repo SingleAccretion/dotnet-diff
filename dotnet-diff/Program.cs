@@ -3,6 +3,7 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.CommandLine.IO;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace DotnetDiff
 {
@@ -76,12 +77,12 @@ namespace DotnetDiff
             var diffAsm = new Command("asm", "Obtains the difference in assembly code produced for two assemblies")
             {
                 new Argument<string>("baseAssembly"),
-                new Argument<string>("newAssembly"),
+                new Argument<string>("diffAssembly"),
                 new Argument<string[]>("references", () => Array.Empty<string>()),
                 new Option<CompilationMode>("--mode", () => CompilationMode.Crossgen)
 
             };
-            diffAsm.Handler = CommandHandler.Create<string, string, string[], CompilationMode, IConsole>(DiffAsm);
+            diffAsm.Handler = CommandHandler.Create<string, string, string[], CompilationMode, IConsole>(DiffAsmHandler);
 
             var cmd = new RootCommand
             {
@@ -115,7 +116,7 @@ namespace DotnetDiff
 
             foreach (var target in targets)
             {
-                Sdk.InstallJit(version, target, Metadata, console);
+                Sdk.Resolve(version, Metadata, console).ResolveTarget(target).InstallJit();
             }
         }
 
@@ -123,7 +124,7 @@ namespace DotnetDiff
         {
             var version = ParseVersion(framework);
 
-            Sdk.InstallCrossgen2(version, Metadata, console);
+            Sdk.Resolve(version, Metadata, console).InstallCrossgen2();
         }
 
         private static FrameworkVersion ParseVersion(string framework)
@@ -183,32 +184,31 @@ namespace DotnetDiff
             }
         }
 
-        private static void DiffAsm(string baseAssembly, string newAssembly, string[] references, CompilationMode mode, IConsole console)
+        private static void DiffAsmHandler(string baseAssembly, string diffAssembly, string[] references, CompilationMode mode, IConsole console)
         {
             IO.EnsureExists(DasmBasePath);
 
-            var dir = Path.Combine(DasmBasePath, $"{Path.GetFileName(baseAssembly)}-vs-{Path.GetFileName(newAssembly)}-{Guid.NewGuid()}");
-            var jitDasm = Path.Combine(JitUtilsBinPath, "jit-dasm.exe");
-            var jitAnalyze = Path.Combine(JitUtilsBinPath, "jit-analyze.exe");
+            var sdk = Sdk.Resolve(Sdk.SupportedSdkVersion, Metadata, console);
 
-            var platform = @"C:\Users\Accretion\source\dotnet\build\CustomCoreRoot";
-            var crossgen = @"C:\Users\Accretion\source\dotnet\runtime\artifacts\bin\coreclr\windows.x64.Checked\crossgen2\crossgen2.exe";
-            var jit = @"C:\Users\Accretion\source\dotnet\runtime\artifacts\bin\coreclr\windows.x64.Checked\clrjit.dll";
+            var opts = new Crossgen2CompilationOptions
+            {
+                JitOptions = { ["NgenDisasm"] = "*" }
+            };
 
-            var baseOut = Path.Combine(dir, "base");
-            var diffOut = Path.Combine(dir, "diff");
+            var baseTmpFile = Path.GetTempFileName();
+            var diffTmpFile = Path.GetTempFileName();
 
-            var cmd = $"-p {platform} -c {crossgen} -o {baseOut} -j {jit} {baseAssembly}";
-            Process.StartProcess(jitDasm, cmd, JitUtilsBinPath, console.Out.WriteLine, console.Error.WriteLine).WaitForExit();
+            var crossgen2 = sdk.ResolveCrossgen2();
+            var baseStream = crossgen2.BeginCompilation(new[] { new AssemblyObject(baseAssembly) }, baseTmpFile, opts, sdk, console);
+            var diffStream = crossgen2.BeginCompilation(new[] { new AssemblyObject(diffAssembly) }, diffTmpFile, opts, sdk, console);
 
-            cmd = cmd.Replace(baseOut, diffOut);
-            cmd = cmd.Replace(baseAssembly, newAssembly);
-            Process.StartProcess(jitDasm, cmd, JitUtilsBinPath, console.Out.WriteLine, console.Error.WriteLine).WaitForExit();
+            // JitAnalyzeAsmDiffer.Diff(baseStream, diffStream, new(Path.GetFileName(baseAssembly), Path.GetFileName(diffAssembly), DasmBasePath), sdk.JitAnalyze);
 
-            cmd = $"-b {baseOut} -d {diffOut} -r";
-            Process.StartProcess(jitAnalyze, cmd, JitUtilsBinPath, console.Out.WriteLine, console.Error.WriteLine).WaitForExit();
-
-            // EnsureDeletion(dir);
+            if (Config.DeleteTempFiles)
+            {
+                File.Delete(baseTmpFile);
+                File.Delete(diffTmpFile);
+            }
         }
     }
 }

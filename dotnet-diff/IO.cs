@@ -1,6 +1,7 @@
 ﻿using System;
 using System.CommandLine.Invocation;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 
@@ -24,11 +25,11 @@ namespace DotnetDiff
             }
         }
 
-        public static void EnsureExists(string dir)
+        public static void EnsureExists(string directory)
         {
-            if (!Directory.Exists(dir))
+            if (!Directory.Exists(directory))
             {
-                Directory.CreateDirectory(dir);
+                Directory.CreateDirectory(directory);
             }
         }
 
@@ -51,6 +52,16 @@ namespace DotnetDiff
             }
 
             Directory.Delete(dir);
+        }
+
+        public static void Move(string source, string destination)
+        {
+            if (Directory.Exists(destination))
+            {
+                Directory.Delete(destination, recursive: true);
+            }
+
+            Directory.Move(source, destination);
         }
 
         public static void Invoke(string command, string args, string workingDirectory)

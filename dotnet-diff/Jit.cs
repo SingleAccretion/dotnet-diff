@@ -5,14 +5,11 @@ namespace DotnetDiff
 {
     public sealed class Jit
     {
-        private Jit(string path)
-        {
-            Path = path;
-        }
+        private Jit(string path) => Path = path;
 
         public string Path { get; }
 
-        public static Jit CreateFromPath(string path)
+        public static Jit FromPath(string path)
         {
             if (!System.IO.Path.GetFileName(path).Contains("clrjit"))
             {
@@ -44,5 +41,15 @@ namespace DotnetDiff
 
             return IO.LibraryFileName($"{baseName}_{os}_{arch}_{hostArch}");
         }
+
+        public static bool Exists(RuntimeIdentifier target) => target.ToString() is
+            "win-x64" or
+            "win-x86" or
+            "win-arm64" or
+            "linux-x64" or
+            "linux-arm" or
+            "linux-arm64" or
+            "osx-x64" or
+            "osx-arm64";
     }
 }

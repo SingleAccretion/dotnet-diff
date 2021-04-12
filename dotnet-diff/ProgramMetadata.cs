@@ -39,46 +39,41 @@ namespace DotnetDiff
 
         public bool JitUtilsSetUp { get => _holder.JitUtils; set => _holder.JitUtils = value; }
 
-        public void AddFullSdk(FrameworkVersion version)
-        {
-            ReplaceSdk(version);
-            ReplaceCrossgen2(version);
-        }
+        public void AddSdk(FrameworkVersion version) => UpdateSdk(version);
 
         public void AddCrossgen2(FrameworkVersion version)
         {
             UpdateSdk(version);
-            ReplaceCrossgen2(version);
+            UpdateCrossgen2(version);
         }
 
-        public void AddFullTarget(FrameworkVersion sdk, RuntimeIdentifier target)
+        public void AddTarget(FrameworkVersion sdk, RuntimeIdentifier target)
         {
             UpdateSdk(sdk);
-            ReplaceTarget(sdk, target);
-            ReplaceRuntimeAssemblies(sdk, target);
-            ReplaceJit(sdk, target);
+            UpdateTarget(sdk, target);
+        }
+
+        public void AddRuntimeAssemblies(FrameworkVersion sdk, RuntimeIdentifier target)
+        {
+            UpdateSdk(sdk);
+            UpdateTarget(sdk, target);
+            UpdateRuntimeAssemblies(sdk, target);
         }
 
         public void AddJit(FrameworkVersion sdk, RuntimeIdentifier target)
         {
             UpdateSdk(sdk);
             UpdateTarget(sdk, target);
-            ReplaceJit(sdk, target);
+            UpdateJit(sdk, target);
         }
+
+        public bool SdkIsAvailable(FrameworkVersion sdk) => SdkIsDefined(sdk);
 
         public bool FullSdkIsAvailable(FrameworkVersion sdk)
         {
             if (!_holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) || !sdkHolder.Crossgen2)
             {
                 return false;
-            }
-
-            foreach (var (_, target) in sdkHolder.Targets)
-            {
-                if (!target.Jit || !target.RuntimeAssemblies)
-                {
-                    return false;
-                }
             }
 
             return true;
@@ -103,6 +98,8 @@ namespace DotnetDiff
             return true;
         }
 
+        public bool TargetIsAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => TargetIsDefined(sdk, target);
+
         public bool RuntimeAssembliesAreAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Targets.TryGetValue(target.ToString(), out var targetHolder) && targetHolder.RuntimeAssemblies;
 
         public bool JitIsAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Targets.TryGetValue(target.ToString(), out var targetHolder) && targetHolder.Jit;
@@ -121,6 +118,8 @@ namespace DotnetDiff
             }
         }
 
+        private void UpdateCrossgen2(FrameworkVersion sdk) => ReplaceCrossgen2(sdk);
+
         private void UpdateTarget(FrameworkVersion sdk, RuntimeIdentifier target)
         {
             if (!TargetIsDefined(sdk, target))
@@ -128,6 +127,10 @@ namespace DotnetDiff
                 ReplaceTarget(sdk, target);
             }
         }
+
+        private void UpdateRuntimeAssemblies(FrameworkVersion sdk, RuntimeIdentifier target) => ReplaceRuntimeAssemblies(sdk, target);
+
+        private void UpdateJit(FrameworkVersion sdk, RuntimeIdentifier target) => ReplaceJit(sdk, target);
 
         private bool SdkIsDefined(FrameworkVersion sdk) => _holder.Sdks.ContainsKey(sdk.RawValue);
         private bool TargetIsDefined(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var targets) && targets.Targets.ContainsKey(target.ToString());
