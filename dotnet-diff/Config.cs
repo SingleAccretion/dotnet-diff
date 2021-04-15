@@ -16,5 +16,7 @@ namespace DotnetDiff
                 console.Out.WriteLine(message);
             }
         }
+
+        public static void WriteLineDebug(this IConsole console) => console.WriteLineDebug("");
     }
 }

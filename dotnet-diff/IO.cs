@@ -1,14 +1,16 @@
 ﻿using System;
 using System.CommandLine.Invocation;
 using System.IO;
-using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 
 namespace DotnetDiff
 {
     public static class IO
     {
+        private static ThreadLocal<HttpClient> _httpClient = new(() => new HttpClient());
+
         public static string ExecutableFileName(string baseName) => OperatingSystem.IsWindows() ? baseName + ".exe" : baseName;
 
         public static string LibraryFileName(string baseName) =>
@@ -77,8 +79,7 @@ namespace DotnetDiff
 
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromDays(1) };
 
-            var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
-            using var response = httpClient.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = RequestGet(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -135,6 +136,15 @@ namespace DotnetDiff
             TriggerProgressChanged(totalDownloadSize, totalBytesRead);
 
             return response.StatusCode;
+        }
+
+        public static HttpResponseMessage RequestGet(string uri, HttpCompletionOption completionOption = HttpCompletionOption.ResponseContentRead, Action<HttpRequestMessage>? modifyRequest = null)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            modifyRequest?.Invoke(request);
+
+            System.Diagnostics.Debug.Assert(_httpClient.Value is not null);
+            return _httpClient.Value.Send(request, completionOption);
         }
     }
 }
