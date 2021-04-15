@@ -9,7 +9,7 @@ namespace DotnetDiff
 {
     public static class IO
     {
-        private static ThreadLocal<HttpClient> _httpClient = new(() => new HttpClient());
+        private static readonly ThreadLocal<HttpClient> _httpClient = new(() => new HttpClient());
 
         public static string ExecutableFileName(string baseName) => OperatingSystem.IsWindows() ? baseName + ".exe" : baseName;
 

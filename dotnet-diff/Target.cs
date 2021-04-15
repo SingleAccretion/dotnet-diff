@@ -130,51 +130,19 @@ namespace DotnetDiff
                 // And we need to know it for getting the commits "above" ours.
                 // So we'll use some common sense to derive it from the version.
 
-                // I did not want to fuzzy search the available branches here or something like that, I am too weak for that.
-                // So, hardcoded branch names they will be and let's pray it doesn't break.
-                // Futile this hope is, but what can one do (not much if one is lazy).
-                var uri = "https://github.com/dotnet/core/blob/main/release-notes/releases-index.json";
-                _console.WriteLineDebug($"GET {uri}");
-                var releasesJson = IO.RequestGet(uri);
-                if (!releasesJson.IsSuccessStatusCode)
-                {
-                    throw new UserException($"Failed to retrieve releases-index.json, server returned {releasesJson.StatusCode}");
-                }
-
-                string? nextRelease = null;
-                int? releasedPreviewNumber = null;
-                List<string> supportedReleases = new List<string>();
-
-                var releases = new List<string>();
-                var json = JsonDocument.Parse(releasesJson.Content.ReadAsStream()).RootElement;
-                json = json.GetProperty("releases-index");
-                foreach (var jsonRelease in json.EnumerateArray())
-                {
-                    var shortVersion = jsonRelease.GetProperty("channel-version").GetString() ?? throw new UserException("Channel version is not present in the JSON for releases");
-                    var fullVersion = jsonRelease.GetProperty("latest-release").GetString() ?? throw new UserException("Version is not present in the JSON for releases");
-                    switch (jsonRelease.GetProperty("support-phase").GetString())
-                    {
-                        case "preview":
-                            releasedPreviewNumber = int.Parse(fullVersion[(fullVersion.IndexOf("-preview.") + "-preview.".Length)..]);
-                            nextRelease = shortVersion;
-                            break;
-                        case "current":
-                        case "lts":
-                            supportedReleases.Add(shortVersion);
-                            break;
-                        case null:
-                            throw new UserException("Support phase is not present in the JSON for releases");
-                    }
-                }
-
                 // It has changed in the past.
                 // But let's assume it won't change for at least another 10 years.
                 const string MainBranch = "main";
 
-                if (version.IsPreview && version.Release == nextRelease)
+                // I did not want to fuzzy search the available branches here or something like that, I am too weak for that.
+                // So, hardcoded branch names they will be and let's pray it doesn't break.
+                // Futile this hope is, but what can one do (not much if one is lazy).
+                var releases = DotnetReleases.Resolve(_console);
+                
+                if (version.IsPreview && version.Release == releases.NextRelease?.ShortVersion)
                 {
                     var previewNumber = version.GetPreviewNumber();
-                    if (previewNumber > releasedPreviewNumber)
+                    if (previewNumber > releases.LatestPreviewVersionNumber)
                     {
                         // We have the latest bits.
                         // Note that this handles the case of "null" "releasedPreviewNumber", which
@@ -249,8 +217,6 @@ namespace DotnetDiff
                         throw new UserException($"Failed to retreive the commits for the Jit-EE GUID changes, server returned: {code}");
                     }
                 }
-
-                Debug.Assert(since is null);
 
                 var commits = GetCommits(_version.CommitHash, "src/coreclr/inc/jiteeversionguid.h", out var code, since);
                 ThrowIfNotFound(commits, code);
@@ -394,33 +360,36 @@ namespace DotnetDiff
             _console.Out.Write($"Looking for a checked {Jit.GetJitName(_runtimeIdentifier)} built close to {_version.CommitHash}");
             _console.WriteLineDebug();
 
-            // Try the commits under us.
             var commits = GetJitCommits();
-            var lowerBound = GetBoundForGuidChanges();
-            _console.WriteLineDebug($"Trying {N} commits below the SDK's, the lower bound date is {lowerBound.Hash}");
-            for (int i = 0; i < N; i++)
+            if (!Config.PreferLaterCommitsForJitInstallation)
             {
-                var (commit, date) = commits[i];
-                if (!(date >= lowerBound.Date))
+                // Try the commits under us.
+                var (lwoerBoundHash, lowerBoundDate) = GetBoundForGuidChanges();
+                _console.WriteLineDebug($"Trying {N} commits below the SDK's, the lower bound date is {lwoerBoundHash}");
+                for (int i = 0; i < N; i++)
                 {
-                    break;
-                }
-                if (TryDownloadJitFromRollingBuild(commit, path))
-                {
-                    return;
+                    var (commit, date) = commits[i];
+                    if (!(date >= lowerBoundDate))
+                    {
+                        break;
+                    }
+                    if (TryDownloadJitFromRollingBuild(commit, path))
+                    {
+                        return;
+                    }
                 }
             }
 
             // Try the commits above us.
             Debug.Assert(_version.CommitHash == commits[0].Hash);
             var thisCommitDate = commits[0].Date;
-            var upperBound = GetBoundForGuidChanges(thisCommitDate);
+            var (upperBoundHash, upperBoundDate) = GetBoundForGuidChanges(thisCommitDate);
             commits = GetJitCommits(thisCommitDate);
-            _console.WriteLineDebug($"Trying {N} commits above the SDK's, the upper bound's date is {upperBound.Hash}");
+            _console.WriteLineDebug($"Trying {N} commits above the SDK's, the upper bound's date is {upperBoundHash}");
             for (int i = 0; i < N; i++)
             {
                 var (commit, date) = commits[i];
-                if (!(date <= upperBound.Date))
+                if (!(date <= upperBoundDate))
                 {
                     break;
                 }
