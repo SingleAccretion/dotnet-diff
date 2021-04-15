@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.CommandLine.IO;
@@ -24,8 +25,8 @@ namespace DotnetDiff
 
         private static int Main(string[] args)
         {
-            static Option<string> FrameworkInstallOption(string itemName) => new Option<string>(new[] { "-f", "--framework" }, "latest", $"The framework version for the {itemName}, e. g. 5.0, 6.0, latest");
-            static Option<string[]> RuntimesInstallOption(string itemName) => new Option<string[]>(new[] { "-r", "--runtimes" }, new[] { RuntimeIdentifier.Host.ToString() }, $"The runtime identifiers for the {itemName} to target, e. g. win-x86, linux-x64");
+            static Option<string> FrameworkInstallOption(string itemName) => new(new[] { "-f", "--framework" }, "latest", $"The framework version for the {itemName}, e. g. 5.0, 6.0, latest");
+            static Option<string[]> RuntimesInstallOption(string itemName) => new(new[] { "-r", "--runtimes" }, new[] { RuntimeIdentifier.Host.ToString() }, $"The runtime identifiers for the {itemName} to target, e. g. win-x86, linux-x64");
 
             IO.EnsureExists(AppDir);
             IO.EnsureExists(Sdk.PathToSDKInstalls);
@@ -49,6 +50,13 @@ namespace DotnetDiff
             };
             installJit.Handler = CommandHandler.Create<string, string[], IConsole>(InstallJitHandler);
 
+            var installRuntimeAssemblies = new Command("runtime-assemblies", "Installs the runtime assemblies for the specified targets")
+            {
+                FrameworkInstallOption("runtime assemblies"),
+                RuntimesInstallOption("runtime assemblies")
+            };
+            installRuntimeAssemblies.Handler = CommandHandler.Create<string, string[], IConsole>(InstallRuntimeAssembliesHandler);
+
             var installCrossgen2 = new Command("crossgen2", "Installs the Crossgen2 compiler")
             {
                 FrameworkInstallOption("Crossgen2")
@@ -70,6 +78,7 @@ namespace DotnetDiff
                 installJitutils,
                 installSdk,
                 installJit,
+                installRuntimeAssemblies,
                 installCrossgen2,
                 listInstall
             };
@@ -117,6 +126,17 @@ namespace DotnetDiff
             foreach (var target in targets)
             {
                 Sdk.Resolve(version, Metadata, console).ResolveTarget(target).InstallJit();
+            }
+        }
+
+        private static void InstallRuntimeAssembliesHandler(string framework, string[] runtimes, IConsole console)
+        {
+            var version = ParseVersion(framework);
+            var targets = ParseRuntimes(runtimes);
+
+            foreach (var target in targets)
+            {
+                Sdk.Resolve(version, Metadata, console).ResolveTarget(target).InstallRuntimeAssemblies();
             }
         }
 
