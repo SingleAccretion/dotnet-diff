@@ -218,6 +218,15 @@ namespace DotnetDiff
                     }
                 }
 
+                if (since is not null)
+                {
+                    _console.WriteLineDebug($"Looking for the upper bound commit - first Jit-EE change since {since}");
+                }
+                else
+                {
+                    _console.WriteLineDebug($"Looking for the lower bound commit - first Jit-EE change before {_version.CommitHash}");
+                }
+
                 var commits = GetCommits(_version.CommitHash, "src/coreclr/inc/jiteeversionguid.h", out var code, since);
                 ThrowIfNotFound(commits, code);
 
@@ -244,7 +253,7 @@ namespace DotnetDiff
                 return since is null ? commits[0] : commits[^1];
             }
 
-            List<(string Hash, DateTimeOffset Date)> GetJitCommits(DateTimeOffset? since = null)
+            List<(string Hash, DateTimeOffset Date)> GetJitCommits(DateTimeOffset? since = null, string? pathOverride = null)
             {
                 void ThrowIfNotFound([NotNull] object? commits, HttpStatusCode code)
                 {
@@ -256,11 +265,11 @@ namespace DotnetDiff
 
                 // We search for commits that touched the Jit to maximize our chances
                 // of getting the build from the rolling build storage.
-                var commits = GetCommits(_version.CommitHash, "src/coreclr/jit", out var code, since);
+                var commits = GetCommits(_version.CommitHash, pathOverride ?? "src/coreclr/jit", out var code, since);
                 ThrowIfNotFound(commits, code);
 
                 // Try the old path - we may be looking for some old commits.
-                if (commits.Count is 0)
+                if (commits.Count is 0 && pathOverride is null)
                 {
                     commits = GetCommits(_version.CommitHash, "src/coreclr/src/jit", out code, since);
                     ThrowIfNotFound(commits, code);
@@ -300,9 +309,7 @@ namespace DotnetDiff
 
                 var tmpFile = Path.GetTempFileName();
 
-                _console.WriteLineDebug($"GET {uri}");
                 bool jitFound = false;
-
                 var status = IO.Download(uri, tmpFile, (read, total) =>
                 {
                     if (read is not null && total is not null)
@@ -364,8 +371,8 @@ namespace DotnetDiff
             if (!Config.PreferLaterCommitsForJitInstallation)
             {
                 // Try the commits under us.
-                var (lwoerBoundHash, lowerBoundDate) = GetBoundForGuidChanges();
-                _console.WriteLineDebug($"Trying {N} commits below the SDK's, the lower bound date is {lwoerBoundHash}");
+                var (lowerBoundHash, lowerBoundDate) = GetBoundForGuidChanges();
+                _console.WriteLineDebug($"Trying commits below {_version.CommitHash}, the lower bound is {lowerBoundHash}");
                 for (int i = 0; i < N; i++)
                 {
                     var (commit, date) = commits[i];
@@ -380,12 +387,38 @@ namespace DotnetDiff
                 }
             }
 
+            // If the user set the config option to prefer later commits, let
+            // this procedure burn some requests on getting the correct information about
+            // the base. The code below ("commits[0]") is just fine for all but one case - when the
+            // commit it is fetching contains the I-GUID change. This is because the
+            // "commits" are fetched from changes to the Jit's source and thus the "first commit below"
+            // is likely to be behind the SDK's commits and it would actually be fine to use
+            // commits after it - they contain the I-GUID change.
+            if (Config.PreferLaterCommitsForJitInstallation)
+            {
+                // We could use the dedicated API here, but we are lazy.
+                _console.WriteLineDebug($"Prefer later commits: looking for a precise date for {_version.CommitHash}");
+                commits = GetCommits(_version.CommitHash, "src", out var code);
+                if (commits is null)
+                {
+                    throw new UserException($"Failed to retrieve commits to narrow down the SDK commit's date, server returned {code}");
+                }
+
+                _console.WriteLineDebug($"Precise date for {_version.CommitHash} found: {commits[0].Date}");
+            }
+
             // Try the commits above us.
-            Debug.Assert(_version.CommitHash == commits[0].Hash);
-            var thisCommitDate = commits[0].Date;
-            var (upperBoundHash, upperBoundDate) = GetBoundForGuidChanges(thisCommitDate);
-            commits = GetJitCommits(thisCommitDate);
-            _console.WriteLineDebug($"Trying {N} commits above the SDK's, the upper bound's date is {upperBoundHash}");
+            var (baseHash, baseDate) = commits[0];
+            var (upperBoundHash, upperBoundDate) = GetBoundForGuidChanges(baseDate);
+            _console.WriteLineDebug($"Trying commits above {baseHash}, the upper bound's is {upperBoundHash}");
+            commits = GetJitCommits(baseDate);
+            if (Config.PreferLaterCommitsForJitInstallation)
+            {
+                // If we want the latest commit, get rid of all non-candidates and
+                // reverse the list. This is not robust in the face of e. g. an empty list.
+                commits.RemoveAll(x => x.Date > upperBoundDate);
+                commits.Reverse();
+            }
             for (int i = 0; i < N; i++)
             {
                 var (commit, date) = commits[i];
