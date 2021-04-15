@@ -116,11 +116,11 @@ namespace DotnetDiff
             return errorCode;
         }
 
-        private static void InstallSdkHandler(string framework, string[] runtimes, IConsole console) => Sdk.Install(ParseVersion(framework), ParseRuntimes(runtimes), Metadata, console);
+        private static void InstallSdkHandler(string framework, string[] runtimes, IConsole console) => Sdk.Install(ParseVersion(framework, console), ParseRuntimes(runtimes), Metadata, console);
 
         private static void InstallJitHandler(string framework, string[] runtimes, IConsole console)
         {
-            var version = ParseVersion(framework);
+            var version = ParseVersion(framework, console);
             var targets = ParseRuntimes(runtimes);
 
             foreach (var target in targets)
@@ -131,7 +131,7 @@ namespace DotnetDiff
 
         private static void InstallRuntimeAssembliesHandler(string framework, string[] runtimes, IConsole console)
         {
-            var version = ParseVersion(framework);
+            var version = ParseVersion(framework, console);
             var targets = ParseRuntimes(runtimes);
 
             foreach (var target in targets)
@@ -142,20 +142,19 @@ namespace DotnetDiff
 
         private static void InstallCrossgen2Handler(string framework, IConsole console)
         {
-            var version = ParseVersion(framework);
+            var version = ParseVersion(framework, console);
 
             Sdk.Resolve(version, Metadata, console).InstallCrossgen2();
         }
 
-        private static FrameworkVersion ParseVersion(string framework)
+        private static FrameworkVersion ParseVersion(string framework, IConsole console)
         {
-            if (!framework.Equals("latest", StringComparison.OrdinalIgnoreCase))
+            if (framework.Equals("latest", StringComparison.OrdinalIgnoreCase))
             {
-                throw new NotSupportedException("Only the latest framework is supported at the moment");
-
+                return FrameworkVersion.ResolveLatest(console);
             }
 
-            return Sdk.SupportedSdkVersion;
+            return FrameworkVersion.Parse(framework);
         }
 
         private static RuntimeIdentifier[] ParseRuntimes(string[] runtimes) => Array.ConvertAll(runtimes, RuntimeIdentifier.Parse);
@@ -208,7 +207,7 @@ namespace DotnetDiff
         {
             IO.EnsureExists(DasmBasePath);
 
-            var sdk = Sdk.Resolve(Sdk.SupportedSdkVersion, Metadata, console);
+            var sdk = Sdk.ResolveForAssemblies(Metadata, console, baseAssembly, diffAssembly);
 
             var opts = new Crossgen2CompilationOptions
             {

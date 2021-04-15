@@ -27,7 +27,7 @@ namespace DotnetDiff
         private static DotnetReleases DownloadReleases(IConsole console)
         {
             var uri = "https://raw.githubusercontent.com/dotnet/core/main/release-notes/releases-index.json";
-            console.WriteLineDebug($"About to download releases.json");
+            console.WriteLineDebug($"About to download releases-index.json");
             console.WriteLineDebug($"GET {uri}");
             var releasesJson = IO.RequestGet(uri);
             if (!releasesJson.IsSuccessStatusCode)
@@ -47,17 +47,18 @@ namespace DotnetDiff
                 var shortVersion = jsonRelease.GetProperty("channel-version").GetString() ?? throw new UserException("Channel version is not present in the JSON for releases");
                 var fullVersion = jsonRelease.GetProperty("latest-release").GetString() ?? throw new UserException("Version is not present in the JSON for releases");
                 var supportPhase = jsonRelease.GetProperty("support-phase").GetString() ?? throw new UserException("Support phase is not present in the JSON for releases");
+                var latestRuntimeVersion = jsonRelease.GetProperty("latest-runtime").GetString() ?? throw new UserException("Latest runtime version is not present in the JSON for releases");
                 switch (supportPhase)
                 {
                     case "preview":
                         latestPreviewVersionNumber = int.Parse(fullVersion[(fullVersion.IndexOf("-preview.") + "-preview.".Length)..]);
-                        nextRelease = new(shortVersion, supportPhase);
+                        nextRelease = new(shortVersion, supportPhase, latestRuntimeVersion);
                         break;
                     case "current":
-                        currentRelease = new(shortVersion, supportPhase);
+                        currentRelease = new(shortVersion, supportPhase, latestRuntimeVersion);
                         break;
                     case "lts":
-                        supportedReleases.Add(new(shortVersion, supportPhase));
+                        supportedReleases.Add(new(shortVersion, supportPhase, latestRuntimeVersion));
                         break;
                     default:
                         break;
@@ -73,5 +74,5 @@ namespace DotnetDiff
         }
     }
 
-    public record DotnetRelease(string ShortVersion, string SupportPhase);
+    public record DotnetRelease(string ShortVersion, string SupportPhase, string LatestRuntimeFullVersion);
 }

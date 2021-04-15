@@ -12,7 +12,7 @@ namespace DotnetDiff
 
         private const int LatestDotnetVersion = 6;
 
-        public static FrameworkVersion SupportedSdkVersion { get; } = new("6.0.0-preview.4.21205.3+7b9ab0e196c78968bac455bf29a9845a85e4a022");
+        // public static FrameworkVersion SupportedSdkVersion { get; } = new("6.0.0-preview.4.21205.3+7b9ab0e196c78968bac455bf29a9845a85e4a022");
 
         private readonly string _rootPath;
         private readonly FrameworkVersion _version;
@@ -28,6 +28,11 @@ namespace DotnetDiff
             _version = version;
             _metadata = metadata;
             _console = console;
+        }
+
+        public static Sdk ResolveForAssemblies(ProgramMetadata metadata, IConsole console, string baseAssembly, string diffAssembly)
+        {
+            return Resolve(FrameworkVersion.ResolveLatest(console), metadata, console);
         }
 
         public static Sdk Resolve(FrameworkVersion version, ProgramMetadata metadata, IConsole console) => Helpers.Resolve(
@@ -93,11 +98,6 @@ namespace DotnetDiff
 
         private static Sdk DefineSdk(FrameworkVersion version, ProgramMetadata metadata, IConsole console)
         {
-            if (version != SupportedSdkVersion)
-            {
-                throw new NotSupportedException($"Installing SDK for {version} is not supported");
-            }
-
             var path = Path.Combine(PathToSDKInstalls, version.RawValue);
             IO.EnsureExists(path);
 

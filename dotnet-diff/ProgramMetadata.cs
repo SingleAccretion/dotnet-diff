@@ -104,7 +104,7 @@ namespace DotnetDiff
 
         public bool JitIsAvailable(FrameworkVersion sdk, RuntimeIdentifier target) => _holder.Sdks.TryGetValue(sdk.RawValue, out var sdkHolder) && sdkHolder.Targets.TryGetValue(target.ToString(), out var targetHolder) && targetHolder.Jit;
 
-        public IEnumerable<FrameworkVersion> EnumerateSdks() => _holder.Sdks.Select(x => new FrameworkVersion(x.Key));
+        public IEnumerable<FrameworkVersion> EnumerateSdks() => _holder.Sdks.Select(x => FrameworkVersion.Parse(x.Key));
 
         public IEnumerable<RuntimeIdentifier> EnumerateTargets(FrameworkVersion sdk) => GetSdk(sdk).Targets.Select(x => RuntimeIdentifier.Parse(x.Key));
 
