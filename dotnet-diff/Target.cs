@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.IO;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -234,16 +233,29 @@ namespace DotnetDiff
                 {
                     // We may be looking at a request for an older branch.
                     // Try the old file path.
-                    var oldBranchCommits = GetCommits(_version.CommitHash, "src/coreclr/src/inc/jiteeversionguid.h", out code);
-                    ThrowIfNotFound(oldBranchCommits, code);
+                    commits = GetCommits(_version.CommitHash, "src/coreclr/src/inc/jiteeversionguid.h", out code, since);
+                    ThrowIfNotFound(commits, code);
 
-                    if (oldBranchCommits.Count is 0)
+                    // Another set of fallbacks: the GUID used to live in corinfo.h.
+                    if (commits.Count is 0)
+                    {
+                        commits = GetCommits(_version.CommitHash, "src/coreclr/inc/corinfo.h", out code, since);
+                        ThrowIfNotFound(commits, code);
+
+                        if (commits.Count is 0)
+                        {
+                            commits = GetCommits(_version.CommitHash, "src/coreclr/src/inc/corinfo.h", out code, since);
+                            ThrowIfNotFound(commits, code);
+                        }
+                    }
+
+                    if (commits.Count is 0)
                     {
                         // We may be looking at a situation where there are no commits above use that changed the I-GUID.
                         // Any commit is fair game then.
                         if (since is not null)
                         {
-                            return ("<No commit>", DateTimeOffset.MaxValue);
+                            return ("<Any commit>", DateTimeOffset.MaxValue);
                         }
 
                         throw new UserException($"Could not retrive the commits changing the Jit-EE interface");
@@ -280,7 +292,10 @@ namespace DotnetDiff
                         return commits;
                     }
 
-                    throw new UserException($"Was not able to retrive commits for changes that affected the Jit, server returned {code}");
+                    if (commits.Count is 0)
+                    {
+                        throw new UserException($"Was not able to retrive commits for changes that affected the Jit, server returned {code}");
+                    }
                 }
 
                 // Reverse the order of commits to make the logic using this method simpler
@@ -362,7 +377,7 @@ namespace DotnetDiff
 
             _console.Out.WriteLine($"Installing the Jit for {_runtimeIdentifier}");
 
-            const int N = 10;
+            var n = 10;
 
             _console.Out.Write($"Looking for a checked {Jit.GetJitName(_runtimeIdentifier)} built close to {_version.CommitHash}");
             _console.WriteLineDebug();
@@ -373,7 +388,7 @@ namespace DotnetDiff
                 // Try the commits under us.
                 var (lowerBoundHash, lowerBoundDate) = GetBoundForGuidChanges();
                 _console.WriteLineDebug($"Trying commits below {_version.CommitHash}, the lower bound is {lowerBoundHash}");
-                for (int i = 0; i < N; i++)
+                for (int i = 0; i < n; i++)
                 {
                     var (commit, date) = commits[i];
                     if (!(date >= lowerBoundDate))
@@ -419,7 +434,14 @@ namespace DotnetDiff
                 commits.RemoveAll(x => x.Date > upperBoundDate);
                 commits.Reverse();
             }
-            for (int i = 0; i < N; i++)
+
+            // We may have fewer commits that we'd like.
+            if (commits.Count < n)
+            {
+                n = commits.Count;
+            }
+
+            for (int i = 0; i < n; i++)
             {
                 var (commit, date) = commits[i];
                 if (!(date <= upperBoundDate))
