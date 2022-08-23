@@ -45,6 +45,7 @@ namespace DotnetDiff
         public static bool Exists(RuntimeIdentifier target) => target.ToString() is
             "win-x64" or
             "win-x86" or
+            "win-arm" or
             "win-arm64" or
             "linux-x64" or
             "linux-arm" or

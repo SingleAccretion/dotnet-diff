@@ -54,12 +54,15 @@ namespace DotnetDiff
                         latestPreviewVersionNumber = int.Parse(fullVersion[(fullVersion.IndexOf("-preview.") + "-preview.".Length)..]);
                         nextRelease = new(shortVersion, supportPhase, latestRuntimeVersion);
                         break;
-                    case "current":
-                        currentRelease = new(shortVersion, supportPhase, latestRuntimeVersion);
-                        break;
+
+                    case "sts":
                     case "lts":
+                    case "current":
+                        // The supported releases are ordered from most recent to least recent. Take the first one as "current".
+                        currentRelease ??= new(shortVersion, supportPhase, latestRuntimeVersion);
                         supportedReleases.Add(new(shortVersion, supportPhase, latestRuntimeVersion));
                         break;
+
                     default:
                         break;
                 }
